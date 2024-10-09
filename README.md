@@ -8,5 +8,7 @@ From this data, we can calculate the height in pixels and transform that into a 
 
 ##### Usage instructions
 To run the program, first create a virtual environment with `bin/virtualenv testing`
+
 To install run `pip install -r requirements.txt`
+
 To run the program, do `python object_detection.py`
