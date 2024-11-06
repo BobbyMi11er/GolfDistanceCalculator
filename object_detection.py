@@ -1,3 +1,4 @@
+import math
 import requests
 from PIL import Image
 import numpy as np
@@ -54,28 +55,47 @@ def get_box_with_highest_confidence(boxes, scores):
 
     # Return a dictionary with the height and the box's coordinates
     return {
-        'height': (best_box[0][3] - best_box[0][1]).item(),  # Convert tensor to scalar
+        'height': round((best_box[0][3] - best_box[0][1]).item(), 5),  # Convert tensor to scalar
         'coordinates': best_box[0].tolist(),  # Convert tensor to list
         'confidence': best_box[1]
     }
 
-# # Example usage:
-# boxes = [[10, 20, 30, 40], [12, 22, 32, 42], [50, 60, 70, 80]]
-# scores = [0.8, 0.9, 0.7]
+def calculate_distance(H_real, H_pixels, image_width, camera_field_of_view_degrees):
+    """
+    Calculate the distance to an object based on its real-world height, height in pixels, 
+    the camera's focal length, and the camera's height from the ground.
 
-# result = get_box_with_best_height_within_confidence_range(boxes, scores)
-# print("Result:", result)
+    Parameters:
+    H_real (float): The real-world height of the object (in meters or the same unit as focal length).
+    H_pixels (float): The height of the object in pixels.
+    focal_length (float): The focal length of the camera (in the same unit as H_real).
+    camera_height (float): The height of the camera from the ground (in meters).
 
+    Returns:
+    float: The straight-line distance to the object.
+    """
 
+    # Step 1: Calculate the distance D (assuming the camera is at the same level as the object)
+    # focal len in pixels = (1/2 (width of img in pixels)) / tan((1/2) * (field of view of camera in degrees)) = 2224.8 for iphone 12
+    # use this as focal length, gives distance in meters
+
+    camera_field_of_view_radians = math.radians(camera_field_of_view_degrees)
+    print(camera_field_of_view_radians)
+    focal_length_pixels = (0.5 * image_width) / math.tan(0.5 * camera_field_of_view_radians) # unit is pixels
+    print("focal length pixels: ", focal_length_pixels) # NOTE: THIS ISN"T THE 2224.8 THAT WE GOT LAST WEEK
+    distance_meters = (H_real * focal_length_pixels) / H_pixels # unit is meters
+
+    # print("D actual:", D_actual)
+    return distance_meters
 
 # Function to plot red dots on top of an image
-def plot_box_on_image(image_url, box, title = "", unnormalized_image = ""):
+def plot_box_on_image(image_url, box, title = "", normalized_image = ""):
     # Load the image from the URL
-    if unnormalized_image == "":
+    if normalized_image == "":
         response = requests.get(image_url)
         img = Image.open(BytesIO(response.content))
     else:
-        img = unnormalized_image
+        img = normalized_image
 
     # Display the image using matplotlib
     fig, ax = plt.subplots()
@@ -84,7 +104,7 @@ def plot_box_on_image(image_url, box, title = "", unnormalized_image = ""):
     # box = [x_min, y_min, x_max, y_max]
     x_min, y_min, x_max, y_max = box
 
-    print(x_min, y_min, x_max, y_max)
+    # print(x_min, y_min, x_max, y_max)
 
     # Plot red dots at the four corners of the box
     # Bottom-left (x_min, y_min)
@@ -102,7 +122,7 @@ def plot_box_on_image(image_url, box, title = "", unnormalized_image = ""):
     else:
         ax.set_title(f"{title}")
     plt.show()
-
+    
 # Load the processor and model
 processor = AutoProcessor.from_pretrained("google/owlv2-base-patch16-ensemble")
 model = Owlv2ForObjectDetection.from_pretrained("google/owlv2-base-patch16-ensemble")
@@ -112,8 +132,17 @@ model = Owlv2ForObjectDetection.from_pretrained("google/owlv2-base-patch16-ensem
 # url = "https://golfdigest.sports.sndimg.com/content/dam/images/golfdigest/fullset/2022/JD1_1689.jpg.rend.hgtvcom.966.644.suffix/1713026356761.jpeg"
 # Masters picture
 # url = "https://golfcourse.uga.edu/_resources/images/IMG_2606_1300x700.jpg"
-url = "https://golfdigest.sports.sndimg.com/content/dam/images/golfdigest/fullset/2017/01/31/5890dd463fb2ecb667fbb08b_Riviera-No.6.jpg.rend.hgtvcom.616.308.suffix/1573304836942.jpeg"
-image = Image.open(requests.get(url, stream=True).raw)
+# url = "https://golfdigest.sports.sndimg.com/content/dam/images/golfdigest/fullset/2017/01/31/5890dd463fb2ecb667fbb08b_Riviera-No.6.jpg.rend.hgtvcom.616.308.suffix/1573304836942.jpeg"
+
+# image = Image.open(requests.get(url, stream=True).raw)
+
+# image = Image.open(r"C:\Users\bobby\Downloads\IMG_2739.jpg")
+image = Image.open(r"C:\Users\bobby\Downloads\IMG_2739 (2).jpg")
+
+# image = image.convert('RGB')
+image = image.rotate(-90, expand=True)
+image.show()
+iphone_image_width_pixels, iphone_image_height_pixels = image.size
 
 # Set up the text queries for object detection
 texts = [["a full golf pin and its flag"]]
@@ -134,10 +163,10 @@ def get_preprocessed_image(pixel_values):
     unnormalized_image = Image.fromarray(unnormalized_image)
     return unnormalized_image
 
-unnormalized_image = get_preprocessed_image(inputs.pixel_values)
+normalized_image = get_preprocessed_image(inputs.pixel_values)
 
 # Convert output bounding boxes and class logits to final results
-target_sizes = torch.Tensor([unnormalized_image.size[::-1]])
+target_sizes = torch.Tensor([normalized_image.size[::-1]])
 results = processor.post_process_object_detection(
     outputs=outputs, threshold=0.2, target_sizes=target_sizes
 )
@@ -150,12 +179,32 @@ boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["l
 
 for box, score, label in zip(boxes, scores, labels):
     box = [round(i, 2) for i in box.tolist()]
-    print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
+    # print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
     tempTitle = "Confidence: " + str(round(score.item(), 3))
-    plot_box_on_image(url, box, tempTitle, unnormalized_image)
+    # plot_box_on_image("", box, tempTitle, unnormalized_image)
 
-best = get_box_with_highest_confidence(boxes, scores)
-print(best["coordinates"])
+if len(boxes) > 1:
+    best = get_box_with_highest_confidence(boxes, scores)
+    # print(best["coordinates"])
+    plot_box_on_image("", [round(i, 2) for i in best['coordinates']], normalized_image=normalized_image, title="Chosen with height in pixels: " + str(best["height"]))
+else:
+    print("No pin detected")
 
-plot_box_on_image(url, [round(i, 2) for i in best['coordinates']], title="Chosen")
+#218.617 pixels
 
+
+focal_length_meters = 0.026
+pin_height_meters = 2.1336 # 7 feet
+# pin_height_meters = 1.8
+my_height_meters = 1.77800 # 5'8"
+
+normalized_flag_height = best["height"]
+iphone_flag_height = iphone_image_height_pixels * normalized_flag_height / normalized_image.height
+iphone_12_field_of_view_degrees = 120
+
+
+print(f"original pixel height: {best["height"]}")
+print(f"Height in iphone pixels: {iphone_flag_height}")
+print("iphone image width pixels: ", iphone_image_width_pixels)
+
+print("Distance from pin: " + str(calculate_distance(pin_height_meters, iphone_flag_height, iphone_image_width_pixels, iphone_12_field_of_view_degrees)))
