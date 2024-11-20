@@ -52,7 +52,6 @@ def get_box_with_highest_confidence(boxes, scores):
 
     # Find the box with the greatest height among eligible boxes
     best_box = max(eligible_boxes, key=lambda x: x[0][3] - x[0][1])  # max based on height (y_max - y_min)
-
     # Return a dictionary with the height and the box's coordinates
     return {
         'height': round((best_box[0][3] - best_box[0][1]).item(), 5),  # Convert tensor to scalar
@@ -80,6 +79,7 @@ def calculate_distance(H_real, H_pixels, image_width, camera_field_of_view_degre
     # use this as focal length, gives distance in meters
 
     camera_field_of_view_radians = math.radians(camera_field_of_view_degrees)
+
     print(camera_field_of_view_radians)
     focal_length_pixels = (0.5 * image_width) / math.tan(0.5 * camera_field_of_view_radians) # unit is pixels
     print("focal length pixels: ", focal_length_pixels) # NOTE: THIS ISN"T THE 2224.8 THAT WE GOT LAST WEEK
@@ -137,7 +137,7 @@ model = Owlv2ForObjectDetection.from_pretrained("google/owlv2-base-patch16-ensem
 # image = Image.open(requests.get(url, stream=True).raw)
 
 # image = Image.open(r"C:\Users\bobby\Downloads\IMG_2739.jpg")
-image = Image.open(r"C:\Users\bobby\Downloads\IMG_2739 (2).jpg")
+image = Image.open(r"C:\Users\bobby\Documents\Programming\ES3890\images\IMG_0012.jpg") # this only detects the flag
 
 # image = image.convert('RGB')
 image = image.rotate(-90, expand=True)
@@ -181,7 +181,7 @@ for box, score, label in zip(boxes, scores, labels):
     box = [round(i, 2) for i in box.tolist()]
     # print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
     tempTitle = "Confidence: " + str(round(score.item(), 3))
-    # plot_box_on_image("", box, tempTitle, unnormalized_image)
+    plot_box_on_image("", box, tempTitle, normalized_image)
 
 if len(boxes) > 1:
     best = get_box_with_highest_confidence(boxes, scores)
