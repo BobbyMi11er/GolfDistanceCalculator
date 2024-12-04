@@ -10,11 +10,9 @@ import object_det_organized
 with gr.Blocks() as app:
     gr.Markdown("# Golf Pin Distance Finder")
     with gr.Column():
-        with gr.Row():
-            with gr.Column():
-                pin_height_textbox = gr.Textbox(lines=1, show_label=False, placeholder="Put pin height in meters")
-                camera_FOV_textbox = gr.Textbox(lines=1, show_label=False, placeholder="Put your camera's field of view in degrees")
-            input_image = gr.Image(label="Input image of golf hole", width="300px")
+        pin_height_textbox = gr.Textbox(lines=1, show_label=False, placeholder="Put pin height in meters")
+        camera_FOV_textbox = gr.Textbox(lines=1, show_label=False, placeholder="Put your camera's field of view in degrees")
+        input_image = gr.Image(label="Input image of golf hole", width="300px")
         calculate_btn = gr.Button("Calculate Distance", variant="primary")
     with gr.Column():
         image_with_box = gr.Image(label="Image with golf pin found", width="300px")
